@@ -69,6 +69,7 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
                         setForeground(
                             foregroundInfo(notificationId, title, progress, processId)
                         )
+                        history.update(itemId) { it.copy(status = DownloadStatus.RUNNING, progress = progress) }
                     }
                 }
             }

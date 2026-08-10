@@ -30,21 +30,33 @@ class YoutubeDLRepository(private val context: Context) {
      * Obtiene la información de un medio y sus formatos disponibles
      * (equivalente a `yt-dlp --dump-json`).
      *
-     * Se ejecuta con un [processId] propio para poder cancelarla o
-     * interrumpirla si tarda demasiado. Reintenta hasta [MAX_ANALYZE_ATTEMPTS]
-     * veces si el fallo es de red/DNS, que suelen ser transitorios.
+     * Usa caché local: analizar la misma URL de nuevo es instantáneo
+     * (hasta [CACHE_TTL_MILLIS]). Se ejecuta con un [processId] propio para
+     * poder cancelarla o interrumpirla si tarda demasiado. Reintenta hasta
+     * [MAX_ANALYZE_ATTEMPTS] veces si el fallo es de red/DNS, que suelen
+     * ser transitorios.
      */
     suspend fun fetchMedia(url: String, processId: String): MediaItem = withContext(Dispatchers.IO) {
+        val trimmed = url.trim()
+        val cacheKey = cacheKey(trimmed)
+        loadCached(cacheKey)?.let { return@withContext it }
+
         var lastError: Exception? = null
         repeat(MAX_ANALYZE_ATTEMPTS) { attempt ->
             try {
-                val request = YoutubeDLRequest(url.trim())
+                val request = YoutubeDLRequest(trimmed)
                 request.addOption("--dump-json")
                 request.addOption("--no-playlist")
                 request.addOption("--no-warnings")
                 request.addOption("--force-ipv4")
+                request.addOption("--socket-timeout", "15")
+                request.addOption("--retries", "2")
+                request.addOption("--extractor-retries", "1")
+                request.addOption("--no-check-formats")
                 val response = execute(request, processId)
-                return@withContext parseVideoInfo(response.out, url.trim())
+                val media = parseVideoInfo(response.out, trimmed)
+                cache(cacheKey, media)
+                return@withContext media
             } catch (e: InterruptedException) {
                 throw CancellationException("Análisis interrumpido")
             } catch (e: com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
@@ -74,6 +86,63 @@ class YoutubeDLRepository(private val context: Context) {
             message.contains("errno 7") ||
             message.contains("errno 8") ||
             message.contains("errno 110")
+    }
+
+    // ----- Caché de análisis -----
+
+    private fun cacheDir(): File = File(context.cacheDir, "analysis").apply { mkdirs() }
+
+    private fun cacheKey(url: String): String {
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(url.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return "$md5.json"
+    }
+
+    private fun loadCached(key: String): MediaItem? {
+        val file = File(cacheDir(), key)
+        if (!file.exists()) return null
+        if (System.currentTimeMillis() - file.lastModified() > CACHE_TTL_MILLIS) {
+            file.delete()
+            return null
+        }
+        return try {
+            parseVideoInfo(file.readText(), key)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun cache(key: String, media: MediaItem) {
+        runCatching {
+            val json = JSONObject().apply {
+                put("id", media.id)
+                put("title", media.title)
+                put("thumbnail", media.thumbnail ?: JSONObject.NULL)
+                put("durationSeconds", media.durationSeconds)
+                put("uploader", media.uploader ?: JSONObject.NULL)
+                put("webpageUrl", media.webpageUrl)
+                put("extractor", media.extractor ?: JSONObject.NULL)
+                put("description", media.description ?: JSONObject.NULL)
+                put("formats", org.json.JSONArray().apply {
+                    media.formats.forEach { f ->
+                        put(JSONObject().apply {
+                            put("format_id", f.formatId)
+                            put("ext", f.ext ?: JSONObject.NULL)
+                            put("height", f.height)
+                            put("width", f.width)
+                            put("fps", f.fps)
+                            put("vcodec", f.videoCodec ?: JSONObject.NULL)
+                            put("acodec", f.audioCodec ?: JSONObject.NULL)
+                            put("format_note", f.note ?: JSONObject.NULL)
+                            put("filesize", f.fileSizeBytes)
+                            put("tbr", f.bitrate)
+                        })
+                    }
+                })
+            }
+            File(cacheDir(), key).writeText(json.toString())
+        }
     }
 
     private fun parseVideoInfo(json: String, url: String): MediaItem {
@@ -204,5 +273,6 @@ class YoutubeDLRepository(private val context: Context) {
 
     companion object {
         private const val MAX_ANALYZE_ATTEMPTS = 2
+        private const val CACHE_TTL_MILLIS = 10 * 60 * 1000L
     }
 }

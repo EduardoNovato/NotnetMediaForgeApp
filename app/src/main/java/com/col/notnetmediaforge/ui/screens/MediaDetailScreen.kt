@@ -10,12 +10,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -27,7 +33,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,9 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.col.notnetmediaforge.R
 import com.col.notnetmediaforge.data.model.DownloadType
 import com.col.notnetmediaforge.data.model.MediaItem
+import com.col.notnetmediaforge.ui.components.GradientButton
 import com.col.notnetmediaforge.ui.components.Thumbnail
 import com.col.notnetmediaforge.ui.components.formatDuration
 import com.col.notnetmediaforge.ui.viewmodel.MainViewModel
@@ -91,7 +96,7 @@ fun MediaDetailScreen(
             ) {
                 Text("No hay información del enlace.", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onBack) { Text("Volver") }
+                androidx.compose.material3.Button(onClick = onBack) { Text("Volver") }
             }
             return@Scaffold
         }
@@ -109,22 +114,9 @@ fun MediaDetailScreen(
         ) {
             Thumbnail(thumbnailUrl = media.thumbnail, modifier = Modifier.fillMaxWidth())
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(media.title, style = MaterialTheme.typography.titleLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    media.uploader?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        formatDuration(media.durationSeconds),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                MediaInfoRow(media)
             }
 
             // Selector Video / MP3
@@ -133,13 +125,27 @@ fun MediaDetailScreen(
                     selected = selectedType == DownloadType.VIDEO,
                     onClick = { selectedType = DownloadType.VIDEO },
                     label = { Text("Video") },
-                    colors = FilterChipDefaults.filterChipColors()
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Movie,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    colors = selectedChipColors(selectedType == DownloadType.VIDEO)
                 )
                 FilterChip(
                     selected = selectedType == DownloadType.AUDIO_MP3,
                     onClick = { selectedType = DownloadType.AUDIO_MP3 },
                     label = { Text("Audio MP3") },
-                    colors = FilterChipDefaults.filterChipColors()
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    colors = selectedChipColors(selectedType == DownloadType.AUDIO_MP3)
                 )
             }
 
@@ -158,7 +164,9 @@ fun MediaDetailScreen(
             }
 
             val isMp3 = selectedType == DownloadType.AUDIO_MP3
-            Button(
+            GradientButton(
+                text = if (isMp3) "Descargar MP3" else "Descargar video",
+                icon = if (isMp3) Icons.Outlined.MusicNote else Icons.Outlined.Download,
                 onClick = {
                     viewModel.startDownload(
                         type = selectedType,
@@ -174,14 +182,65 @@ fun MediaDetailScreen(
                     onOpenHistory()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Icon(Icons.Outlined.Download, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (isMp3) "Descargar MP3" else "Descargar video", style = MaterialTheme.typography.titleMedium)
-            }
+            )
         }
     }
 }
+
+@Composable
+private fun MediaInfoRow(media: MediaItem) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        media.uploader?.let {
+            InfoChip(icon = Icons.Outlined.AccountCircle, text = it)
+        }
+        if (media.durationSeconds > 0) {
+            InfoChip(icon = Icons.Outlined.Schedule, text = formatDuration(media.durationSeconds))
+        }
+        media.extractor?.let {
+            InfoChip(icon = Icons.Outlined.Public, text = it)
+        }
+    }
+}
+
+@Composable
+private fun InfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(15.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun selectedChipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
+    containerColor = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    },
+    labelColor = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    },
+    iconColor = if (selected) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+)
 
 @Composable
 private fun QualitySection(
@@ -200,7 +259,8 @@ private fun QualitySection(
                 FilterChip(
                     selected = selected == value,
                     onClick = { onSelect(value) },
-                    label = { Text(label) }
+                    label = { Text(label) },
+                    colors = selectedChipColors(selected == value)
                 )
             }
         }

@@ -95,7 +95,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     ?: "El análisis tardó demasiado. Comprueba tu conexión e inténtalo de nuevo."
                 _uiState.update { it.copy(isAnalyzing = false, analyzeProcessId = null, error = message) }
             } else {
-                _uiState.update { it.copy(isAnalyzing = false, analyzeProcessId = null, mediaItem = media) }
+                _uiState.update {
+                    it.copy(
+                        isAnalyzing = false,
+                        analyzeProcessId = null,
+                        mediaItem = media,
+                        analysisCount = it.analysisCount + 1
+                    )
+                }
             }
         }
     }
@@ -170,7 +177,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun getApp() = appContext
 
     companion object {
-        private const val ANALYZE_TIMEOUT_MILLIS = 120_000L
+        private const val ANALYZE_TIMEOUT_MILLIS = 90_000L
     }
 }
 
@@ -179,5 +186,6 @@ data class HomeUiState(
     val isAnalyzing: Boolean = false,
     val error: String? = null,
     val mediaItem: MediaItem? = null,
-    val analyzeProcessId: String? = null
+    val analyzeProcessId: String? = null,
+    val analysisCount: Int = 0
 )
