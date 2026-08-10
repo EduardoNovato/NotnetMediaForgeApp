@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NotnetMediaForge</string>
+    <string name="app_tagline">Descarga videos y audio desde cualquier plataforma</string>
+
+    <!-- Pantalla principal -->
+    <string name="home_title">NotnetMediaForge</string>
+    <string name="home_subtitle">Pega un enlace para empezar</string>
+    <string name="url_label">Enlace de video o audio</string>
+    <string name="url_hint">https://…</string>
+    <string name="paste">Pegar</string>
+    <string name="analyze">Analizar</string>
+    <string name="analyzing">Analizando enlace…</string>
+    <string name="loading">Cargando…</string>
+    <string name="empty_state_title">No hay nada todavía</string>
+    <string name="empty_state_body">Comparte un video desde cualquier app o pega un enlace aquí.</string>
+    <string name="clear">Limpiar</string>
+    <string name="history">Historial</string>
+
+    <!-- Pantalla de información -->
+    <string name="video">Video</string>
+    <string name="audio_mp3">Audio MP3</string>
+    <string name="quality">Calidad</string>
+    <string name="format_hint">Elige la calidad disponible</string>
+    <string name="download">Descargar</string>
+    <string name="starting">Iniciando descarga…</string>
+    <string name="duration">Duración</string>
+    <string name="uploader">Canal</string>
+    <string name="retry">Reintentar</string>
+
+    <!-- Historial -->
+    <string name="history_empty">Aún no hay descargas</string>
+    <string name="history_empty_body">Las descargas realizadas aparecerán aquí.</string>
+    <string name="completed">Completado</string>
+    <string name="failed">Fallido</string>
+    <string name="cancelled">Cancelado</string>
+    <string name="running">Descargando…</string>
+    <string name="queued">En cola</string>
+    <string name="clear_history">Borrar historial</string>
+    <string name="open_file">Abrir</string>
+    <string name="delete">Eliminar</string>
+    <string name="save_video">Guardar video</string>
+    <string name="save_audio">Guardar audio</string>
+    <string name="saved_location">Guardado en Descargas</string>
+
+    <!-- Notificaciones -->
+    <string name="channel_downloads_name">Descargas</string>
+    <string name="channel_downloads_description">Progreso de las descargas de medios</string>
+    <string name="notif_downloading">Descargando…</string>
+    <string name="notif_cancel">Cancelar</string>
+    <string name="notif_done">Descarga completada</string>
+    <string name="notif_failed">La descarga falló</string>
+
+    <!-- Errores -->
+    <string name="error_no_url">Escribe o pega un enlace válido</string>
+    <string name="error_invalid_url">Ese enlace no es válido</string>
+    <string name="error_unsupported">No se pudo obtener información del enlace. Comprueba que sea compatible.</string>
+    <string name="error_init">No se pudo inicializar el motor de descarga</string>
+    <string name="error_download">Error al descargar</string>
+    <string name="error_save">No se pudo guardar el archivo</string>
+    <string name="error_no_formats">No se encontraron formatos disponibles</string>
+
+    <string name="url_field_missing">El enlace está vacío</string>
+</resources>
