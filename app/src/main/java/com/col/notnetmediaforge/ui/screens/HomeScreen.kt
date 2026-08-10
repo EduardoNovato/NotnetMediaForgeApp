@@ -15,17 +15,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,9 +39,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.col.notnetmediaforge.EngineState
 import com.col.notnetmediaforge.ui.components.MediaPreviewCard
 import com.col.notnetmediaforge.ui.viewmodel.MainViewModel
-import androidx.compose.runtime.collectAsState
 
 @Composable
 fun HomeScreen(
@@ -46,6 +49,7 @@ fun HomeScreen(
     onAnalyzed: () -> Unit
 ) {
     val state = viewModel.uiState.collectAsState().value
+    val engineState by viewModel.engineState.collectAsState()
     val clipboard = LocalClipboardManager.current
 
     var navigated by rememberSaveable { mutableStateOf(false) }
@@ -67,6 +71,30 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Header()
+
+        // Estado del motor de descarga
+        when (engineState) {
+            is EngineState.Initializing -> {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "Preparando el motor de descarga… (solo la primera vez puede tardar)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            is EngineState.Error -> {
+                Text(
+                    "Error al preparar el motor: ${(engineState as EngineState.Error).message}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            is EngineState.Ready -> Unit
+        }
+
+        val engineReady = engineState is EngineState.Ready
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(
@@ -93,29 +121,31 @@ fun HomeScreen(
                         clipboard.getText()?.text?.let(viewModel::updateUrl)
                     },
                     modifier = Modifier.weight(1f),
-                    enabled = !state.isAnalyzing
+                    enabled = !state.isAnalyzing && engineReady
                 ) {
                     Icon(Icons.Outlined.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Pegar")
                 }
-                Button(
-                    onClick = { viewModel.analyze() },
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.isAnalyzing
-                ) {
-                    if (state.isAnalyzing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
+                if (state.isAnalyzing) {
+                    OutlinedButton(
+                        onClick = { viewModel.cancelAnalysis() },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                    } else {
+                        Text("Cancelar")
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.analyze() },
+                        modifier = Modifier.weight(1f),
+                        enabled = engineReady
+                    ) {
                         Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
+                        Text("Analizar")
                     }
-                    Text(if (state.isAnalyzing) "Analizando…" else "Analizar")
                 }
             }
         }

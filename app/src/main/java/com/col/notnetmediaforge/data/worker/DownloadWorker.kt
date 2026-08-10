@@ -1,6 +1,7 @@
 package com.col.notnetmediaforge.data.worker
 
 import android.content.Context
+import android.content.pm.ServiceInfo
 import android.os.Environment
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -45,12 +46,7 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
         val processId = itemId
 
         setForeground(
-            ForegroundInfo(
-                notificationId,
-                NotificationHelper.buildProgressNotification(
-                    applicationContext, notificationId, title, 0f, processId
-                )
-            )
+            foregroundInfo(notificationId, title, 0f, processId)
         )
 
         history.update(itemId) { it.copy(status = DownloadStatus.RUNNING, progress = 0f) }
@@ -71,12 +67,7 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
                         last = intProgress
                         setProgress(workDataOf(PROGRESS to intProgress))
                         setForeground(
-                            ForegroundInfo(
-                                notificationId,
-                                NotificationHelper.buildProgressNotification(
-                                    applicationContext, notificationId, title, progress, processId
-                                )
-                            )
+                            foregroundInfo(notificationId, title, progress, processId)
                         )
                     }
                 }
@@ -145,6 +136,15 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
             }
         }
     }
+
+    private fun foregroundInfo(notificationId: Int, title: String, progress: Float, processId: String): ForegroundInfo =
+        ForegroundInfo(
+            notificationId,
+            NotificationHelper.buildProgressNotification(
+                applicationContext, notificationId, title, progress, processId
+            ),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        )
 
     private fun guessMimeType(extension: String, isAudio: Boolean): String {
         return when (extension.lowercase()) {

@@ -1,14 +1,14 @@
 package com.col.notnetmediaforge.data.repository
 
 import android.content.Context
-import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLRequest
-import com.yausername.youtubedl_android.mapper.VideoFormat
-import com.yausername.youtubedl_android.mapper.VideoInfo
+import com.col.notnetmediaforge.data.model.DownloadType
 import com.col.notnetmediaforge.data.model.FormatItem
 import com.col.notnetmediaforge.data.model.MediaItem
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.CancellationException
 
@@ -27,55 +27,72 @@ class YoutubeDLRepository(private val context: Context) {
     }
 
     /**
-     * Obtiene la información de un medio y sus formatos disponibles.
-     * Equivale a `yt-dlp --dump-json`.
+     * Obtiene la información de un medio y sus formatos disponibles
+     * (equivalente a `yt-dlp --dump-json`).
+     *
+     * Se ejecuta con un [processId] propio para poder cancelarla o
+     * interrumpirla si tarda demasiado.
      */
-    suspend fun fetchMedia(url: String): MediaItem = withContext(Dispatchers.IO) {
-        val info = try {
-            YoutubeDL.getInstance().getInfo(url.trim())
+    suspend fun fetchMedia(url: String, processId: String): MediaItem = withContext(Dispatchers.IO) {
+        val request = YoutubeDLRequest(url.trim())
+        request.addOption("--dump-json")
+        request.addOption("--no-playlist")
+        request.addOption("--no-warnings")
+        val response = try {
+            YoutubeDL.getInstance().execute(request, processId)
         } catch (e: InterruptedException) {
             throw CancellationException("Análisis interrumpido")
+        } catch (e: com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
+            throw CancellationException("Análisis cancelado")
         }
-        val title = info.title ?: info.fulltitle ?: "Sin título"
-        val formats = buildFormats(info)
-        MediaItem(
-            id = info.id ?: url,
-            title = title,
-            thumbnail = info.thumbnail,
-            durationSeconds = info.duration.toLong(),
-            uploader = info.uploader,
-            webpageUrl = info.webpageUrl ?: url.trim(),
-            extractor = info.extractor,
-            description = info.description,
-            formats = formats
+        parseVideoInfo(response.out, url.trim())
+    }
+
+    private fun parseVideoInfo(json: String, url: String): MediaItem {
+        val root = JSONObject(json)
+        val formats = root.optJSONArray("formats")
+        val formatItems = if (formats != null) {
+            buildList {
+                for (i in 0 until formats.length()) {
+                    val f = formats.getJSONObject(i)
+                    add(f.toFormatItem())
+                }
+            }.filter { it.hasVideo && it.height > 0 }
+                .groupBy { it.height }
+                .mapNotNull { (_, group) -> group.maxByOrNull { it.bitrate } }
+                .sortedByDescending { it.height }
+        } else {
+            emptyList()
+        }
+        return MediaItem(
+            id = root.optString("id").ifBlank { url },
+            title = root.optString("title").ifBlank { root.optString("fulltitle").ifBlank { "Sin título" } },
+            thumbnail = root.optNullable("thumbnail"),
+            durationSeconds = root.optLong("duration"),
+            uploader = root.optNullable("uploader"),
+            webpageUrl = root.optString("webpage_url").ifBlank { url },
+            extractor = root.optNullable("extractor"),
+            description = root.optNullable("description"),
+            formats = formatItems
         )
     }
 
-    private fun buildFormats(info: VideoInfo): List<FormatItem> {
-        return (info.formats ?: emptyList())
-            .map { it.toFormatItem() }
-            .filter { it.hasVideo && it.height > 0 }
-            .groupBy { it.height }
-            .mapNotNull { (_, group) -> group.maxByOrNull { it.bitrate } }
-            .sortedByDescending { it.height }
-    }
-
-    private fun VideoFormat.toFormatItem(): FormatItem {
-        val hasVideo = !vcodec.isNullOrEmpty() && vcodec != "none"
-        val hasAudio = !acodec.isNullOrEmpty() && acodec != "none"
+    private fun JSONObject.toFormatItem(): FormatItem {
+        val vcodec = optNullable("vcodec")
+        val acodec = optNullable("acodec")
         return FormatItem(
-            formatId = formatId ?: "",
-            ext = ext,
-            height = height,
-            width = width,
-            fps = fps,
+            formatId = optString("format_id"),
+            ext = optNullable("ext"),
+            height = optInt("height"),
+            width = optInt("width"),
+            fps = optInt("fps"),
             videoCodec = vcodec,
             audioCodec = acodec,
-            note = formatNote,
-            fileSizeBytes = fileSize.takeIf { it > 0 } ?: fileSizeApproximate,
-            bitrate = tbr,
-            hasVideo = hasVideo,
-            hasAudio = hasAudio
+            note = optNullable("format_note"),
+            fileSizeBytes = optLongOrZero("filesize").takeIf { it > 0 } ?: optLongOrZero("filesize_approx"),
+            bitrate = optInt("tbr"),
+            hasVideo = !vcodec.isNullOrEmpty() && vcodec != "none",
+            hasAudio = !acodec.isNullOrEmpty() && acodec != "none"
         )
     }
 
@@ -88,7 +105,7 @@ class YoutubeDLRepository(private val context: Context) {
      */
     suspend fun download(
         url: String,
-        type: com.col.notnetmediaforge.data.model.DownloadType,
+        type: DownloadType,
         qualityHeight: Int,
         audioQuality: String?,
         outputDir: File,
@@ -97,10 +114,11 @@ class YoutubeDLRepository(private val context: Context) {
     ): File = withContext(Dispatchers.IO) {
         val request = YoutubeDLRequest(url.trim())
         request.addOption("--no-mtime")
+        request.addOption("--no-playlist")
         request.addOption("-o", "${outputDir.absolutePath}/%(title)s.%(ext)s")
 
         when (type) {
-            com.col.notnetmediaforge.data.model.DownloadType.VIDEO -> {
+            DownloadType.VIDEO -> {
                 val selector = if (qualityHeight > 0) {
                     "bv*[height<=$qualityHeight]+ba/b[height<=$qualityHeight]/b"
                 } else {
@@ -109,7 +127,7 @@ class YoutubeDLRepository(private val context: Context) {
                 request.addOption("-f", selector)
                 request.addOption("--merge-output-format", "mp4")
             }
-            com.col.notnetmediaforge.data.model.DownloadType.AUDIO_MP3 -> {
+            DownloadType.AUDIO_MP3 -> {
                 request.addOption("-x")
                 request.addOption("--audio-format", "mp3")
                 request.addOption("--audio-quality", audioQuality ?: "0")
@@ -135,9 +153,23 @@ class YoutubeDLRepository(private val context: Context) {
     }
 
     /**
-     * Cancela una descarga activa identificada por [processId].
+     * Cancela un proceso activo (análisis o descarga) identificado por [processId].
      */
     fun cancel(processId: String) {
         runCatching { YoutubeDL.getInstance().destroyProcessById(processId) }
     }
+
+    /**
+     * Actualiza yt-dlp a la última versión estable.
+     */
+    @Throws(Exception::class)
+    fun updateYtdlp() {
+        YoutubeDL.getInstance().updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
+    }
+
+    private fun JSONObject.optNullable(key: String): String? =
+        if (isNull(key)) null else optString(key)
+
+    private fun JSONObject.optLongOrZero(key: String): Long =
+        if (isNull(key)) 0L else optLong(key)
 }

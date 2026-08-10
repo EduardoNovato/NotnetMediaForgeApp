@@ -9,6 +9,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.col.notnetmediaforge.EngineState
 import com.col.notnetmediaforge.NotnetMediaForgeApp
 import com.col.notnetmediaforge.R
 import com.col.notnetmediaforge.data.model.DownloadRequest
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URI
 
 /**
@@ -29,10 +31,13 @@ import java.net.URI
  */
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val container = (app as NotnetMediaForgeApp).container
+    private val appContext = app as NotnetMediaForgeApp
+    private val container = appContext.container
     private val repository = container.youtubeDLRepository
     private val history = container.downloadHistoryRepository
     private val workManager = WorkManager.getInstance(app)
+
+    val engineState: StateFlow<EngineState> = appContext.engineState
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -57,21 +62,47 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.update { it.copy(error = getApp().getString(R.string.error_invalid_url)) }
             return
         }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isAnalyzing = true, error = null) }
-            runCatching { repository.fetchMedia(url) }
-                .onSuccess { media ->
-                    _uiState.update { it.copy(isAnalyzing = false, mediaItem = media) }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            isAnalyzing = false,
-                            error = resolveError(e)
-                        )
-                    }
-                }
+        when (val engine = engineState.value) {
+            EngineState.Initializing -> {
+                _uiState.update { it.copy(error = "El motor de descarga aún se está preparando. Espera unos segundos y reintenta.") }
+                return
+            }
+            is EngineState.Error -> {
+                _uiState.update { it.copy(error = "Motor de descarga no disponible: ${engine.message}") }
+                return
+            }
+            EngineState.Ready -> Unit
         }
+        val processId = "analyze_${System.currentTimeMillis()}"
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAnalyzing = true, error = null, analyzeProcessId = processId) }
+
+            var failureMessage: String? = null
+            val media = withTimeoutOrNull(ANALYZE_TIMEOUT_MILLIS) {
+                try {
+                    repository.fetchMedia(url, processId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    failureMessage = e.message
+                    null
+                }
+            }
+
+            if (media == null) {
+                repository.cancel(processId)
+                val message = failureMessage?.take(300)
+                    ?: "El análisis tardó demasiado. Comprueba tu conexión e inténtalo de nuevo."
+                _uiState.update { it.copy(isAnalyzing = false, analyzeProcessId = null, error = message) }
+            } else {
+                _uiState.update { it.copy(isAnalyzing = false, analyzeProcessId = null, mediaItem = media) }
+            }
+        }
+    }
+
+    fun cancelAnalysis() {
+        _uiState.value.analyzeProcessId?.let { repository.cancel(it) }
+        _uiState.update { it.copy(isAnalyzing = false, analyzeProcessId = null, error = null) }
     }
 
     /**
@@ -136,17 +167,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrDefault(false)
     }
 
-    private fun resolveError(e: Throwable): String {
-        if (e is CancellationException) return getApp().getString(R.string.error_unsupported)
-        return e.message ?: getApp().getString(R.string.error_unsupported)
-    }
+    private fun getApp() = appContext
 
-    private fun getApp() = getApplication<NotnetMediaForgeApp>()
+    companion object {
+        private const val ANALYZE_TIMEOUT_MILLIS = 120_000L
+    }
 }
 
 data class HomeUiState(
     val urlText: String = "",
     val isAnalyzing: Boolean = false,
     val error: String? = null,
-    val mediaItem: MediaItem? = null
+    val mediaItem: MediaItem? = null,
+    val analyzeProcessId: String? = null
 )
