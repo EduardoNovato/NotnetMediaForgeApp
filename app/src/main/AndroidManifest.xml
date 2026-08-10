@@ -65,6 +65,13 @@
         <receiver
             android:name=".data.notification.DownloadCancelReceiver"
             android:exported="false" />
+
+        <!-- Declara el tipo de servicio en primer plano de WorkManager;
+             sin esto, Android 14+ rechaza startForeground(..., dataSync) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
     </application>
 
 </manifest>
