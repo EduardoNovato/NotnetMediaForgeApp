@@ -1,15 +1,30 @@
+# Gradle
+.gradle/
+build/
+/app/build/
+/captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Local configuration
+local.properties
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
+.kotlin/
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.idea/
+
+# NDK / native
 .externalNativeBuild
 .cxx
-local.properties
+cmake-build-*/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -31,21 +31,49 @@ class YoutubeDLRepository(private val context: Context) {
      * (equivalente a `yt-dlp --dump-json`).
      *
      * Se ejecuta con un [processId] propio para poder cancelarla o
-     * interrumpirla si tarda demasiado.
+     * interrumpirla si tarda demasiado. Reintenta hasta [MAX_ANALYZE_ATTEMPTS]
+     * veces si el fallo es de red/DNS, que suelen ser transitorios.
      */
     suspend fun fetchMedia(url: String, processId: String): MediaItem = withContext(Dispatchers.IO) {
-        val request = YoutubeDLRequest(url.trim())
-        request.addOption("--dump-json")
-        request.addOption("--no-playlist")
-        request.addOption("--no-warnings")
-        val response = try {
-            YoutubeDL.getInstance().execute(request, processId)
-        } catch (e: InterruptedException) {
-            throw CancellationException("Análisis interrumpido")
-        } catch (e: com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
-            throw CancellationException("Análisis cancelado")
+        var lastError: Exception? = null
+        repeat(MAX_ANALYZE_ATTEMPTS) { attempt ->
+            try {
+                val request = YoutubeDLRequest(url.trim())
+                request.addOption("--dump-json")
+                request.addOption("--no-playlist")
+                request.addOption("--no-warnings")
+                request.addOption("--force-ipv4")
+                val response = execute(request, processId)
+                return@withContext parseVideoInfo(response.out, url.trim())
+            } catch (e: InterruptedException) {
+                throw CancellationException("Análisis interrumpido")
+            } catch (e: com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
+                throw CancellationException("Análisis cancelado")
+            } catch (e: Exception) {
+                lastError = e
+                if (!isNetworkError(e) || attempt == MAX_ANALYZE_ATTEMPTS - 1) {
+                    throw e
+                }
+            }
         }
-        parseVideoInfo(response.out, url.trim())
+        throw lastError ?: IllegalStateException("Análisis fallido")
+    }
+
+    private fun execute(request: YoutubeDLRequest, processId: String) =
+        YoutubeDL.getInstance().execute(request, processId)
+
+    /** Detecta errores transitorios de red/DNS que merecen un reintento. */
+    private fun isNetworkError(e: Exception): Boolean {
+        val message = e.message?.lowercase() ?: return false
+        return message.contains("no address associated with hostname") ||
+            message.contains("temporary failure in name resolution") ||
+            message.contains("network is unreachable") ||
+            message.contains("timed out") ||
+            message.contains("connection refused") ||
+            message.contains("unable to download api page") ||
+            message.contains("errno 7") ||
+            message.contains("errno 8") ||
+            message.contains("errno 110")
     }
 
     private fun parseVideoInfo(json: String, url: String): MediaItem {
@@ -115,6 +143,7 @@ class YoutubeDLRepository(private val context: Context) {
         val request = YoutubeDLRequest(url.trim())
         request.addOption("--no-mtime")
         request.addOption("--no-playlist")
+        request.addOption("--force-ipv4")
         request.addOption("-o", "${outputDir.absolutePath}/%(title)s.%(ext)s")
 
         when (type) {
@@ -172,4 +201,8 @@ class YoutubeDLRepository(private val context: Context) {
 
     private fun JSONObject.optLongOrZero(key: String): Long =
         if (isNull(key)) 0L else optLong(key)
+
+    companion object {
+        private const val MAX_ANALYZE_ATTEMPTS = 2
+    }
 }
