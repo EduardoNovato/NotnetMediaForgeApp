@@ -38,41 +38,6 @@ val DarkOnErrorContainer = Color(0xFFFFDAD6)
 val DarkOutline = Color(0xFF8B91A2)
 val DarkOutlineVariant = Color(0xFF2A2F3D)
 
-// ---- Paleta modo claro (refinada) ----
-val LightPrimary = Color(0xFF5A4BC0)
-val LightOnPrimary = Color(0xFFFFFFFF)
-val LightPrimaryContainer = Color(0xFFE8E0FF)
-val LightOnPrimaryContainer = Color(0xFF1C006B)
-
-val LightSecondary = Color(0xFF006A64)
-val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFF9BF2EA)
-val LightOnSecondaryContainer = Color(0xFF00201D)
-
-val LightTertiary = Color(0xFF8C4A5C)
-val LightOnTertiary = Color(0xFFFFFFFF)
-val LightTertiaryContainer = Color(0xFFFFD9E0)
-val LightOnTertiaryContainer = Color(0xFF3B071B)
-
-val LightBackground = Color(0xFFFDFBFF)
-val LightOnBackground = Color(0xFF1B1B1F)
-val LightSurface = Color(0xFFFDFBFF)
-val LightOnSurface = Color(0xFF1B1B1F)
-val LightSurfaceVariant = Color(0xFFE4E1EC)
-val LightOnSurfaceVariant = Color(0xFF47464F)
-val LightSurfaceContainerLow = Color(0xFFF7F4FA)
-val LightSurfaceContainer = Color(0xFFF1EDF7)
-val LightSurfaceContainerHigh = Color(0xFFEBE7F1)
-val LightSurfaceContainerHighest = Color(0xFFE5E1EC)
-val LightOnSurfaceContainer = Color(0xFF1F1E24)
-val LightSurfaceTint = Color(0xFF5A4BC0)
-val LightError = Color(0xFFBA1A1A)
-val LightOnError = Color(0xFFFFFFFF)
-val LightErrorContainer = Color(0xFFFFDAD6)
-val LightOnErrorContainer = Color(0xFF410002)
-val LightOutline = Color(0xFF777680)
-val LightOutlineVariant = Color(0xFFC7C5D0)
-
 // ---- Colores de marca (degradados y acentos) ----
 val BrandGradientStart = Color(0xFF8B7CF6)
 val BrandGradientMid = Color(0xFF7C6BEF)
@@ -80,11 +45,4 @@ val BrandGradientEnd = Color(0xFF2DD4BF)
 
 val BrandGradient: Brush = Brush.linearGradient(
     colors = listOf(BrandGradientStart, BrandGradientMid, BrandGradientEnd)
-)
-
-val BrandGradientSoft: Brush = Brush.linearGradient(
-    colors = listOf(
-        BrandGradientStart.copy(alpha = 0.18f),
-        BrandGradientEnd.copy(alpha = 0.10f)
-    )
 )

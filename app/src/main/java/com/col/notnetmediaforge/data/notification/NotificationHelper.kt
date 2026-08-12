@@ -40,12 +40,6 @@ object NotificationHelper {
         progress: Float,
         processId: String
     ): android.app.Notification {
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            notificationId,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
         val cancelIntent = PendingIntent.getBroadcast(
             context,
             notificationId,
@@ -57,7 +51,7 @@ object NotificationHelper {
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(title)
             .setContentText(context.getString(R.string.notif_downloading))
-            .setContentIntent(contentIntent)
+            .setContentIntent(openAppIntent(context, notificationId))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setProgress(100, progress.toInt(), progress <= 0f)
@@ -66,12 +60,6 @@ object NotificationHelper {
     }
 
     fun buildDoneNotification(context: Context, notificationId: Int, title: String, success: Boolean): android.app.Notification {
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            notificationId,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(
                 if (success) android.R.drawable.stat_sys_download_done
@@ -81,10 +69,17 @@ object NotificationHelper {
             .setContentText(
                 context.getString(if (success) R.string.notif_done else R.string.notif_failed)
             )
-            .setContentIntent(contentIntent)
+            .setContentIntent(openAppIntent(context, notificationId))
             .setAutoCancel(true)
             .build()
     }
+
+    private fun openAppIntent(context: Context, notificationId: Int): PendingIntent = PendingIntent.getActivity(
+        context,
+        notificationId,
+        Intent(context, MainActivity::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
 
     fun show(context: Context, notificationId: Int, notification: android.app.Notification) {
         runCatching {

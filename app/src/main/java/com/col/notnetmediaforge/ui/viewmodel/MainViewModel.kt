@@ -48,10 +48,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(urlText = text) }
     }
 
-    fun clear() {
-        _uiState.value = HomeUiState()
-    }
-
     fun analyze() {
         val url = _uiState.value.urlText.trim()
         if (url.isEmpty()) {
@@ -131,8 +127,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             title = media.title,
             thumbnail = media.thumbnail,
             uploader = media.uploader,
-            durationSeconds = media.durationSeconds,
-            extractor = media.extractor
+            durationSeconds = media.durationSeconds
         )
         enqueue(request)
     }

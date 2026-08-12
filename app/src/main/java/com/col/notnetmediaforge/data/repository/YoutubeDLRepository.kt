@@ -19,14 +19,6 @@ import java.util.concurrent.CancellationException
 class YoutubeDLRepository(private val context: Context) {
 
     /**
-     * Inicializa el motor (yt-dlp + python + ffmpeg). Es idempotente.
-     */
-    @Throws(Exception::class)
-    fun initialize() {
-        YoutubeDL.getInstance().init(context)
-    }
-
-    /**
      * Obtiene la información de un medio y sus formatos disponibles
      * (equivalente a `yt-dlp --dump-json`).
      *
@@ -116,27 +108,18 @@ class YoutubeDLRepository(private val context: Context) {
     private fun cache(key: String, media: MediaItem) {
         runCatching {
             val json = JSONObject().apply {
-                put("id", media.id)
                 put("title", media.title)
-                put("thumbnail", media.thumbnail ?: JSONObject.NULL)
+                putNullable("thumbnail", media.thumbnail)
                 put("durationSeconds", media.durationSeconds)
-                put("uploader", media.uploader ?: JSONObject.NULL)
+                putNullable("uploader", media.uploader)
                 put("webpageUrl", media.webpageUrl)
-                put("extractor", media.extractor ?: JSONObject.NULL)
-                put("description", media.description ?: JSONObject.NULL)
+                putNullable("extractor", media.extractor)
                 put("formats", org.json.JSONArray().apply {
                     media.formats.forEach { f ->
                         put(JSONObject().apply {
-                            put("format_id", f.formatId)
-                            put("ext", f.ext ?: JSONObject.NULL)
                             put("height", f.height)
-                            put("width", f.width)
-                            put("fps", f.fps)
-                            put("vcodec", f.videoCodec ?: JSONObject.NULL)
-                            put("acodec", f.audioCodec ?: JSONObject.NULL)
-                            put("format_note", f.note ?: JSONObject.NULL)
-                            put("filesize", f.fileSizeBytes)
                             put("tbr", f.bitrate)
+                            put("vcodec", if (f.hasVideo) "h264" else "none")
                         })
                     }
                 })
@@ -162,34 +145,22 @@ class YoutubeDLRepository(private val context: Context) {
             emptyList()
         }
         return MediaItem(
-            id = root.optString("id").ifBlank { url },
             title = root.optString("title").ifBlank { root.optString("fulltitle").ifBlank { "Sin título" } },
             thumbnail = root.optNullable("thumbnail"),
             durationSeconds = root.optLong("duration"),
             uploader = root.optNullable("uploader"),
             webpageUrl = root.optString("webpage_url").ifBlank { url },
             extractor = root.optNullable("extractor"),
-            description = root.optNullable("description"),
             formats = formatItems
         )
     }
 
     private fun JSONObject.toFormatItem(): FormatItem {
         val vcodec = optNullable("vcodec")
-        val acodec = optNullable("acodec")
         return FormatItem(
-            formatId = optString("format_id"),
-            ext = optNullable("ext"),
             height = optInt("height"),
-            width = optInt("width"),
-            fps = optInt("fps"),
-            videoCodec = vcodec,
-            audioCodec = acodec,
-            note = optNullable("format_note"),
-            fileSizeBytes = optLongOrZero("filesize").takeIf { it > 0 } ?: optLongOrZero("filesize_approx"),
             bitrate = optInt("tbr"),
-            hasVideo = !vcodec.isNullOrEmpty() && vcodec != "none",
-            hasAudio = !acodec.isNullOrEmpty() && acodec != "none"
+            hasVideo = !vcodec.isNullOrEmpty() && vcodec != "none"
         )
     }
 
@@ -256,20 +227,6 @@ class YoutubeDLRepository(private val context: Context) {
     fun cancel(processId: String) {
         runCatching { YoutubeDL.getInstance().destroyProcessById(processId) }
     }
-
-    /**
-     * Actualiza yt-dlp a la última versión estable.
-     */
-    @Throws(Exception::class)
-    fun updateYtdlp() {
-        YoutubeDL.getInstance().updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
-    }
-
-    private fun JSONObject.optNullable(key: String): String? =
-        if (isNull(key)) null else optString(key)
-
-    private fun JSONObject.optLongOrZero(key: String): Long =
-        if (isNull(key)) 0L else optLong(key)
 
     companion object {
         private const val MAX_ANALYZE_ATTEMPTS = 2

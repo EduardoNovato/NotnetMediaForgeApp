@@ -24,10 +24,6 @@ class DownloadHistoryRepository(context: Context) {
 
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
-    init {
-        _items.value = load()
-    }
-
     fun newId(): String = UUID.randomUUID().toString()
 
     /**
@@ -56,17 +52,19 @@ class DownloadHistoryRepository(context: Context) {
     }
 
     fun update(id: String, transform: (DownloadItem) -> DownloadItem) {
-        _items.value = _items.value.map { if (it.id == id) transform(it) else it }
-        save()
+        mutate { items -> items.map { if (it.id == id) transform(it) else it } }
     }
 
     fun remove(id: String) {
-        _items.value = _items.value.filterNot { it.id == id }
-        save()
+        mutate { items -> items.filterNot { it.id == id } }
     }
 
     fun clear() {
-        _items.value = emptyList()
+        mutate { emptyList() }
+    }
+
+    private fun mutate(block: (List<DownloadItem>) -> List<DownloadItem>) {
+        _items.value = block(_items.value)
         save()
     }
 
@@ -98,16 +96,16 @@ class DownloadHistoryRepository(context: Context) {
         put("url", url)
         put("type", type.name)
         put("title", title)
-        put("thumbnail", thumbnail ?: JSONObject.NULL)
-        put("uploader", uploader ?: JSONObject.NULL)
+        putNullable("thumbnail", thumbnail)
+        putNullable("uploader", uploader)
         put("durationSeconds", durationSeconds)
         put("createdAtMillis", createdAtMillis)
         put("status", status.name)
         put("progress", progress)
-        put("savedUri", savedUri ?: JSONObject.NULL)
-        put("fileDisplayName", fileDisplayName ?: JSONObject.NULL)
-        put("mimeType", mimeType ?: JSONObject.NULL)
-        put("error", error ?: JSONObject.NULL)
+        putNullable("savedUri", savedUri)
+        putNullable("fileDisplayName", fileDisplayName)
+        putNullable("mimeType", mimeType)
+        putNullable("error", error)
     }
 
     private fun JSONObject.toDownloadItem(): DownloadItem = DownloadItem(
@@ -126,8 +124,4 @@ class DownloadHistoryRepository(context: Context) {
         mimeType = optNullable("mimeType"),
         error = optNullable("error")
     )
-
-    private fun JSONObject.optNullable(key: String): String? {
-        return if (isNull(key)) null else optString(key)
-    }
 }

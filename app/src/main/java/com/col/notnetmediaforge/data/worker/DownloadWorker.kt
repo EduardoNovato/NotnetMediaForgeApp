@@ -38,9 +38,6 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
         val qualityHeight = inputData.getInt(KEY_QUALITY_HEIGHT, 0)
         val audioQuality = inputData.getString(KEY_AUDIO_QUALITY)
         val title = inputData.getString(KEY_TITLE) ?: url
-        val uploader = inputData.getString(KEY_UPLOADER)
-        val thumbnail = inputData.getString(KEY_THUMBNAIL)
-        val duration = inputData.getLong(KEY_DURATION, 0L)
 
         val notificationId = itemId.hashCode()
         val processId = itemId
@@ -113,15 +110,9 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
                 }
                 Result.success()
             } catch (e: CancellationException) {
-                MediaStoreManager.deleteTempDirectory(outputDir)
-                NotificationHelper.cancel(applicationContext, notificationId)
-                history.update(itemId) { it.copy(status = DownloadStatus.CANCELLED, progress = 0f) }
-                Result.failure()
+                markCancelled(itemId, outputDir, notificationId)
             } catch (e: com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
-                MediaStoreManager.deleteTempDirectory(outputDir)
-                NotificationHelper.cancel(applicationContext, notificationId)
-                history.update(itemId) { it.copy(status = DownloadStatus.CANCELLED, progress = 0f) }
-                Result.failure()
+                markCancelled(itemId, outputDir, notificationId)
             } catch (e: Exception) {
                 MediaStoreManager.deleteTempDirectory(outputDir)
                 NotificationHelper.cancel(applicationContext, notificationId)
@@ -136,6 +127,13 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
                 collectJob.cancel()
             }
         }
+    }
+
+    private fun markCancelled(itemId: String, outputDir: File, notificationId: Int): Result {
+        MediaStoreManager.deleteTempDirectory(outputDir)
+        NotificationHelper.cancel(applicationContext, notificationId)
+        history.update(itemId) { it.copy(status = DownloadStatus.CANCELLED, progress = 0f) }
+        return Result.failure()
     }
 
     private fun foregroundInfo(notificationId: Int, title: String, progress: Float, processId: String): ForegroundInfo =
@@ -169,9 +167,6 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
         const val KEY_QUALITY_HEIGHT = "qualityHeight"
         const val KEY_AUDIO_QUALITY = "audioQuality"
         const val KEY_TITLE = "title"
-        const val KEY_THUMBNAIL = "thumbnail"
-        const val KEY_UPLOADER = "uploader"
-        const val KEY_DURATION = "duration"
         const val KEY_ITEM_ID = "itemId"
         const val PROGRESS = "progress"
 
@@ -184,9 +179,6 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
                 KEY_QUALITY_HEIGHT to request.qualityHeight,
                 KEY_AUDIO_QUALITY to (request.audioQuality ?: ""),
                 KEY_TITLE to request.title,
-                KEY_THUMBNAIL to (request.thumbnail ?: ""),
-                KEY_UPLOADER to (request.uploader ?: ""),
-                KEY_DURATION to request.durationSeconds,
                 KEY_ITEM_ID to itemId
             )
     }

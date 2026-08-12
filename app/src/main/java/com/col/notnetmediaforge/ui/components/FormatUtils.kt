@@ -14,17 +14,3 @@ fun formatDuration(seconds: Long): String {
         String.format(Locale.getDefault(), "%02d:%02d", m, s)
     }
 }
-
-/** Formatea bytes como unidades legibles. */
-fun formatFileSize(bytes: Long): String {
-    if (bytes <= 0) return ""
-    val units = arrayOf("B", "KB", "MB", "GB")
-    var value = bytes.toDouble()
-    var unitIndex = 0
-    while (value >= 1024 && unitIndex < units.lastIndex) {
-        value /= 1024
-        unitIndex++
-    }
-    return if (unitIndex == 0) "${bytes} B"
-    else String.format(Locale.getDefault(), "%.1f %s", value, units[unitIndex])
-}

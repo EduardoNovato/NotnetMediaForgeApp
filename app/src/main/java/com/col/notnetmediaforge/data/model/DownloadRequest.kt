@@ -20,6 +20,5 @@ data class DownloadRequest(
     val title: String,
     val thumbnail: String?,
     val uploader: String?,
-    val durationSeconds: Long,
-    val extractor: String?
+    val durationSeconds: Long
 )
