@@ -40,7 +40,7 @@ fun GradientButton(
     val brush = if (enabled) {
         gradient
     } else {
-        Brush.linearGradient(colors = listOf(Color.Gray.copy(alpha = 0.35f)))
+        Brush.linearGradient(colors = listOf(Color.Gray.copy(alpha = 0.35f), Color.Gray.copy(alpha = 0.35f)))
     }
     Box(
         modifier = modifier
