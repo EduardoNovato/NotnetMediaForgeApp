@@ -69,6 +69,7 @@ class DownloadHistoryRepository(context: Context) {
     }
 
     private fun save() {
+        _items.value = _items.value.take(MAX_HISTORY_ENTRIES)
         val array = JSONArray()
         _items.value.forEach { array.put(it.toJson()) }
         try {
@@ -124,4 +125,8 @@ class DownloadHistoryRepository(context: Context) {
         mimeType = optNullable("mimeType"),
         error = optNullable("error")
     )
+
+    private companion object {
+        const val MAX_HISTORY_ENTRIES = 100
+    }
 }

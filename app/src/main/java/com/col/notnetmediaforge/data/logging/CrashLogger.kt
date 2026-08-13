@@ -21,7 +21,8 @@ object CrashLogger {
             runCatching {
                 val file = File(context.filesDir, "crash.log")
                 val trace = Log.getStackTraceString(throwable)
-                file.appendText("\n==== ${Date()} [${thread.name}] ====\n$trace\n")
+                // Solo la última traza: sobrescribir evita que el archivo crezca sin límite.
+                file.writeText("\n==== ${Date()} [${thread.name}] ====\n$trace\n")
             }
             previous?.uncaughtException(thread, throwable)
         }

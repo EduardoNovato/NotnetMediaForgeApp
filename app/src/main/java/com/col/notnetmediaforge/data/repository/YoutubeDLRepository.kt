@@ -184,6 +184,10 @@ class YoutubeDLRepository(private val context: Context) {
         request.addOption("--no-mtime")
         request.addOption("--no-playlist")
         request.addOption("--force-ipv4")
+        request.addOption("--retries", "3")
+        request.addOption("--fragment-retries", "5")
+        request.addOption("--extractor-retries", "3")
+        request.addOption("--retry-sleep", "1")
         request.addOption("-o", "${outputDir.absolutePath}/%(title)s.%(ext)s")
 
         when (type) {
@@ -205,12 +209,30 @@ class YoutubeDLRepository(private val context: Context) {
             }
         }
 
+        // Últimas líneas de salida de yt-dlp (incluye stderr) para poder
+        // diagnosticar fallos como el HTTP Error 403.
+        val lastLines = ArrayDeque<String>()
+        fun capture(line: String?) {
+            if (line.isNullOrBlank()) return
+            lastLines.addLast(line)
+            if (lastLines.size > 40) lastLines.removeFirst()
+        }
+
         try {
             YoutubeDL.getInstance().execute(request, processId) { progress, eta, line ->
+                capture(line)
                 onProgress(progress, eta, line)
             }
         } catch (e: InterruptedException) {
             throw CancellationException("Descarga interrumpida")
+        } catch (e: Exception) {
+            val ytErrors = lastLines.filter { it.contains("ERROR:", ignoreCase = true) }.takeLast(3)
+            if (ytErrors.isNotEmpty()) {
+                throw IllegalStateException(
+                    "${e.message} | yt-dlp: ${ytErrors.joinToString(" | ")}"
+                )
+            }
+            throw e
         }
 
         val file = outputDir.listFiles()

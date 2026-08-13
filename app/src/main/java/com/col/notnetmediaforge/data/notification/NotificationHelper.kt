@@ -59,16 +59,19 @@ object NotificationHelper {
             .build()
     }
 
-    fun buildDoneNotification(context: Context, notificationId: Int, title: String, success: Boolean): android.app.Notification {
+    fun buildDoneNotification(context: Context, notificationId: Int, title: String, success: Boolean, detail: String? = null): android.app.Notification {
+        val text = when {
+            success -> context.getString(R.string.notif_done)
+            detail.isNullOrBlank() -> context.getString(R.string.notif_failed)
+            else -> detail
+        }
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(
                 if (success) android.R.drawable.stat_sys_download_done
                 else android.R.drawable.stat_notify_error
             )
             .setContentTitle(title)
-            .setContentText(
-                context.getString(if (success) R.string.notif_done else R.string.notif_failed)
-            )
+            .setContentText(text)
             .setContentIntent(openAppIntent(context, notificationId))
             .setAutoCancel(true)
             .build()

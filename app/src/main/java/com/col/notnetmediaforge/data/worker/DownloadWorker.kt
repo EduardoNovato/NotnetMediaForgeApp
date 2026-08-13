@@ -114,12 +114,18 @@ class DownloadWorker(appContext: Context, params: WorkerParameters) :
             } catch (e: com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
                 markCancelled(itemId, outputDir, notificationId)
             } catch (e: Exception) {
+                runCatching {
+                    val errorLog = File(applicationContext.filesDir, "ytdlp_error.log")
+                    errorLog.writeText(
+                        "${java.util.Date()}\n${e.message}\n${android.util.Log.getStackTraceString(e)}\n"
+                    )
+                }
                 MediaStoreManager.deleteTempDirectory(outputDir)
                 NotificationHelper.cancel(applicationContext, notificationId)
                 NotificationHelper.show(
                     applicationContext,
                     notificationId,
-                    NotificationHelper.buildDoneNotification(applicationContext, notificationId, title, false)
+                    NotificationHelper.buildDoneNotification(applicationContext, notificationId, title, false, e.message)
                 )
                 history.update(itemId) { it.copy(status = DownloadStatus.FAILED, progress = 0f, error = e.message) }
                 Result.failure()
